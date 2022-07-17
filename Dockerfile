@@ -1,9 +1,9 @@
-FROM python:3.7-buster
+FROM rahulvbrahmal/python-with-talib
 # FROM ubuntu:18.04 
 # RUN rm /bin/sh && ln -s /bin/bash /bin/sh
 ENV DEBIAN_FRONTEND noninteractive
 
-ENV TZ=Asia/Taipei
+ENV TZ=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 ARG USERNAME
@@ -11,19 +11,12 @@ ENV USERNAME ${USERNAME}
 ENV WORKSPACE /home/$USERNAME/workspace
 
 # base
-RUN apt-get update && apt-get install -y build-essential wget curl vim git libtool automake \
-    sudo openssh-server \
-    mesa-utils libgl1-mesa-glx python3-dev \
-    libqt5gui5 postgresql libpq-dev \
-    locales locales-all \
-    libfontconfig \
-    libfreetype6 \
-    xfonts-cyrillic \
-    xfonts-scalable \
-    fonts-liberation \
-    fonts-ipafont-gothic \
-    fonts-wqy-zenhei \
-    fonts-wqy-microhei
+COPY ./files/etc/apt/sources.list /etc/apt/sources.list
+RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 3B4FE6ACC0B21F32
+RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 871920D1991BC93C
+RUN apt-get update && apt-get install -y build-essential \
+    wget curl vim git libtool automake \
+    sudo openssh-server libpq-dev \
 
 #---------------------------------------------------------------------------
 # lang
@@ -36,7 +29,7 @@ ENV LANGUAGE en_US.UTF-8
 #---------------------------------------------------------------------------
 # ssh
 #---------------------------------------------------------------------------
-RUN ssh-keygen -A
+RUN /usr/bin/ssh-keygen -A
 RUN mkdir /var/run/sshd
 ADD ./files/sshd_config /etc/ssh/sshd_config
 
@@ -44,7 +37,7 @@ RUN echo "AcceptEnv LANG LC_*" >> /etc/ssh/sshd_config
 RUN echo "AllowUsers $USERNAME" >> /etc/ssh/sshd_config
 
 # still need to run with -p to export ports
-EXPOSE 23456
+EXPOSE 222
 # RUN service ssh restart
 RUN echo 'root:root' | chpasswd
 RUN echo "$USERNAME ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
@@ -73,60 +66,38 @@ RUN mkdir -p /home/$USERNAME/.vscode-server/extensions \
 # vnpy
 #---------------------------------------------------------------------------
 # ta-lib underlying lib (must have before pip install)
-RUN mkdir -p /tmp && cd /tmp && wget https://artiya4u.keybase.pub/TA-lib/ta-lib-0.4.0-src.tar.gz
-RUN cd /tmp && tar -xvf /tmp/ta-lib-0.4.0-src.tar.gz
-RUN cd /tmp/ta-lib && ./configure --prefix=/usr && make && sudo make install
+# RUN mkdir -p /tmp && cd /tmp && wget https://artiya4u.keybase.pub/TA-lib/ta-lib-0.4.0-src.tar.gz
+# RUN cd /tmp && tar -xvf /tmp/ta-lib-0.4.0-src.tar.gz
+# RUN cd /tmp/ta-lib && ./configure --prefix=/usr && make && sudo make install
 RUN ta-lib-config --libs
-
-# quickfix lib
-# RUN mkdir -p /tmp && cd /tmp && git clone https://github.com/quickfix/quickfix.git
-RUN mkdir -p /tmp && cd /tmp && \
-    wget https://github.com/quickfix/quickfix/archive/v1.15.1.tar.gz && \
-    tar xvf v1.15.1.tar.gz
-RUN mv /tmp/quickfix-1.15.1 /tmp/quickfix
-RUN cd /tmp/quickfix && ./bootstrap && ./configure --with-python3 && make && sudo make install
 
 # python
 RUN mkdir -p $WORKSPACE
 RUN cd $WORKSPACE && python3 -m venv venv
 RUN $WORKSPACE/venv/bin/pip install pip --upgrade && \
-    $WORKSPACE/venv/bin/pip install wheel && \
-    $WORKSPACE/venv/bin/pip install backtrader pandas && \
-    $WORKSPACE/venv/bin/pip install shioaji --upgrade && \
-    $WORKSPACE/venv/bin/pip install git+https://github.com/happydasch/btplotting && \
-    $WORKSPACE/venv/bin/pip install matplotlib==3.2.2 && \
-    $WORKSPACE/venv/bin/pip install ta-lib && \
-    $WORKSPACE/venv/bin/pip install requests
-
-RUN $WORKSPACE/venv/bin/pip install tzlocal plotly pyqtgraph qdarkstyle rqdatac peewee
+    $WORKSPACE/venv/bin/pip install wheel
 
 # clone vnpy (commit: b4e8a079be2123e72bfa9a8cccebc784aaee3789)
 # RUN cd $WORKSPACE && git clone https://github.com/vnpy/vnpy.git
 # RUN cd $WORKSPACE/vnpy && git checkout b4e8a079be2123e72bfa9a8cccebc784aaee3789
 RUN cd $WORKSPACE && \
-    wget https://github.com/vnpy/vnpy/archive/2.1.9.tar.gz && \
-    tar xvf 2.1.9.tar.gz && mv $WORKSPACE/vnpy-2.1.9 $WORKSPACE/vnpy
+    git clone https://github.com/ChuangZhang/vnpy.git $WORKSPACE/vnpy && \
+    cd $WORKSPACE/vnpy && \
+    bash install.sh $WORKSPACE/venv/bin/python3 https://pypi.tuna.tsinghua.edu.cn/simple
 ADD ./vnpy-files/patches $WORKSPACE/patches
 RUN cd $WORKSPACE/vnpy && git apply $WORKSPACE/patches/*.patch
 
-# get sinopac gateway
-RUN mkdir -p $WORKSPACE/vnpy/vnpy/gateway/sinopac
-RUN cd $WORKSPACE/vnpy/vnpy/gateway/sinopac && \
-    wget https://raw.githubusercontent.com/ypochien/vnpy/SinopacGateway/vnpy/gateway/sinopac/__init__.py
-RUN cd $WORKSPACE/vnpy/vnpy/gateway/sinopac && \
-    wget https://raw.githubusercontent.com/ypochien/vnpy/SinopacGateway/vnpy/gateway/sinopac/sinopac_gateway.py
-
 # RUN chmod +x ./vnpy/install.sh
 # RUN cd $WORKSPACE/vnpy && source $WORKSPACE/venv/bin/activate && ./install.sh 
-RUN $WORKSPACE/venv/bin/pip install psycopg2-binary
+RUN $WORKSPACE/venv/bin/pip install psycopg2-binary -i https://pypi.tuna.tsinghua.edu.cn/simple
 RUN $WORKSPACE/venv/bin/pip install https://pip.vnpy.com/colletion/ibapi-9.76.1.tar.gz
 
 # quickfix
 # RUN cd $WORKSPACE/vnpy && sed -i.bak '/quickfix/d' requirements.txt
-RUN $WORKSPACE/venv/bin/pip install -r $WORKSPACE/vnpy/requirements.txt
+RUN $WORKSPACE/venv/bin/pip install -r $WORKSPACE/vnpy/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # upgrade numpy
-RUN $WORKSPACE/venv/bin/pip install numpy --upgrade
+RUN $WORKSPACE/venv/bin/pip install numpy --upgrade -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # build wheel (skip)
 RUN cd $WORKSPACE/vnpy && $WORKSPACE/venv/bin/python setup.py build
@@ -145,11 +116,10 @@ RUN cd $WORKSPACE && sudo chmod +x ./copy-so.sh && ./copy-so.sh
 RUN echo "export WORKSPACE=$WORKSPACE" >> ~/.bashrc
 RUN echo "export LD_LIBRARY_PATH=$WORKSPACE/vnpy/vnpy/api/xtp/libs" >> ~/.bashrc
 RUN echo "export PYTHONPATH=$PYTHONPATH:$WORKSPACE/vnpy" >> ~/.bashrc
-
 RUN echo "source ~/workspace/venv/bin/activate" >> ~/.bashrc
 
 # timezone
-RUN echo "export TZ=Asia/Taipei" >> ~/.profile
+RUN echo "export TZ=Asia/Shanghai" >> ~/.profile
 RUN echo "export LC_CTYPE=en_US.utf-8" >> ~/.profile
 RUN echo "export LANG=en_US.UTF-8" >> ~/.profile
 # supress libGL error: No matching fbConfigs or visuals found

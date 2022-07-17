@@ -109,4 +109,4 @@ ENV/
 .ropeproject
 .flaskenv
 run/*
-
+.idea
