@@ -1,0 +1,1 @@
+sudo docker build -t zchuang:vnpy --rm --force-rm  --build-arg USERNAME=zchuang .

@@ -6,9 +6,16 @@ ENV DEBIAN_FRONTEND noninteractive
 ENV TZ=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-ARG USERNAME
+ARG USERNAME=zchuang
 ENV USERNAME ${USERNAME}
 ENV WORKSPACE /home/$USERNAME/workspace
+
+#---------------------------------------------------------------------------
+# lang
+#---------------------------------------------------------------------------
+
+ENV LANG en_US.UTF-8
+ENV LANGUAGE en_US:
 
 # base
 COPY ./files/etc/apt/sources.list /etc/apt/sources.list
@@ -16,15 +23,8 @@ RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 3B4FE6ACC0B21F32
 RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 871920D1991BC93C
 RUN apt-get update && apt-get install -y build-essential \
     wget curl vim git libtool automake \
-    sudo openssh-server libpq-dev \
-
-#---------------------------------------------------------------------------
-# lang
-#---------------------------------------------------------------------------
-
-ENV LC_ALL en_US.UTF-8
-ENV LANG en_US.UTF-8
-ENV LANGUAGE en_US.UTF-8
+    sudo openssh-server libpq-dev locales
+RUN locale-gen $LANG
 
 #---------------------------------------------------------------------------
 # ssh
@@ -46,6 +46,7 @@ RUN echo "$USERNAME ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 RUN useradd -rm -d /home/${USERNAME} -s /bin/bash -g root -G sudo -u 1001 ${USERNAME}
 RUN echo "${USERNAME}:${USERNAME}" | chpasswd
 RUN usermod -aG sudo ${USERNAME}
+COPY ./files/home/bash/.bash_aliases /home/$USERNAME
 
 # vscode
 # https://code.visualstudio.com/docs/remote/containers-advanced#_avoiding-extension-reinstalls-on-container-rebuild
@@ -69,44 +70,39 @@ RUN mkdir -p /home/$USERNAME/.vscode-server/extensions \
 # RUN mkdir -p /tmp && cd /tmp && wget https://artiya4u.keybase.pub/TA-lib/ta-lib-0.4.0-src.tar.gz
 # RUN cd /tmp && tar -xvf /tmp/ta-lib-0.4.0-src.tar.gz
 # RUN cd /tmp/ta-lib && ./configure --prefix=/usr && make && sudo make install
+ENV INDEX https://pypi.tuna.tsinghua.edu.cn/simple
 RUN ta-lib-config --libs
 
 # python
 RUN mkdir -p $WORKSPACE
-RUN cd $WORKSPACE && python3 -m venv venv
-RUN $WORKSPACE/venv/bin/pip install pip --upgrade && \
-    $WORKSPACE/venv/bin/pip install wheel
+RUN cd $WORKSPACE && python3 -m venv --system-site-packages --copies venv
+RUN $WORKSPACE/venv/bin/pip install pip --upgrade -i ${INDEX} && \
+    $WORKSPACE/venv/bin/pip install wheel --upgrade -i ${INDEX}
 
 # clone vnpy (commit: b4e8a079be2123e72bfa9a8cccebc784aaee3789)
 # RUN cd $WORKSPACE && git clone https://github.com/vnpy/vnpy.git
 # RUN cd $WORKSPACE/vnpy && git checkout b4e8a079be2123e72bfa9a8cccebc784aaee3789
+ENV prefix /usr/bin
+# upgrade numpy
+RUN $WORKSPACE/venv/bin/pip install numpy --upgrade -i ${INDEX}
 RUN cd $WORKSPACE && \
-    git clone https://github.com/ChuangZhang/vnpy.git $WORKSPACE/vnpy && \
-    cd $WORKSPACE/vnpy && \
+    git clone https://github.com/ChuangZhang/vnpy.git $WORKSPACE/vnpy
+RUN cd $WORKSPACE/vnpy && \
     bash install.sh $WORKSPACE/venv/bin/python3 https://pypi.tuna.tsinghua.edu.cn/simple
-ADD ./vnpy-files/patches $WORKSPACE/patches
-RUN cd $WORKSPACE/vnpy && git apply $WORKSPACE/patches/*.patch
 
 # RUN chmod +x ./vnpy/install.sh
 # RUN cd $WORKSPACE/vnpy && source $WORKSPACE/venv/bin/activate && ./install.sh 
-RUN $WORKSPACE/venv/bin/pip install psycopg2-binary -i https://pypi.tuna.tsinghua.edu.cn/simple
+RUN $WORKSPACE/venv/bin/pip install psycopg2-binary -i ${INDEX}
 RUN $WORKSPACE/venv/bin/pip install https://pip.vnpy.com/colletion/ibapi-9.76.1.tar.gz
 
 # quickfix
 # RUN cd $WORKSPACE/vnpy && sed -i.bak '/quickfix/d' requirements.txt
-RUN $WORKSPACE/venv/bin/pip install -r $WORKSPACE/vnpy/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-
-# upgrade numpy
-RUN $WORKSPACE/venv/bin/pip install numpy --upgrade -i https://pypi.tuna.tsinghua.edu.cn/simple
-
-# build wheel (skip)
-RUN cd $WORKSPACE/vnpy && $WORKSPACE/venv/bin/python setup.py build
-RUN cd $WORKSPACE/vnpy && $WORKSPACE/venv/bin/python -m pip install .
+RUN $WORKSPACE/venv/bin/pip install -r $WORKSPACE/vnpy/requirements.txt -i ${INDEX}
 
 # workaround extensions .so
-ADD ./vnpy-files/copy-so.sh $WORKSPACE
+# ADD ./vnpy-files/copy-so.sh $WORKSPACE
 # RUN cd $WORKSPACE && chmod +x ./copy-so.sh && ./copy-so.sh
-RUN cd $WORKSPACE && sudo chmod +x ./copy-so.sh && ./copy-so.sh
+# RUN cd $WORKSPACE && sudo chmod +x ./copy-so.sh && ./copy-so.sh
 
 #---------------------------------------------------------------------------
 # environment
@@ -136,6 +132,3 @@ RUN sudo rm -rf /tmp/ta-lib*
 RUN sudo rm -rf /tmp/quickfix
 
 ENTRYPOINT sudo service ssh restart && bash
-
-
-
