@@ -89,6 +89,10 @@ RUN cd $WORKSPACE && \
     git clone https://github.com/ChuangZhang/vnpy.git $WORKSPACE/vnpy
 RUN cd $WORKSPACE/vnpy && \
     bash install.sh $WORKSPACE/venv/bin/python3 https://pypi.tuna.tsinghua.edu.cn/simple
+RUN cd $WORKSPACE && \
+    git clone https://github.com/ChuangZhang/vnpy_rpcservice.git $WORKSPACE/vnpy_rpcservice
+RUN cd $WORKSPACE/vnpy_rpcservice && \
+    pip install -f .
 
 # RUN chmod +x ./vnpy/install.sh
 # RUN cd $WORKSPACE/vnpy && source $WORKSPACE/venv/bin/activate && ./install.sh 
