@@ -110,3 +110,5 @@ ENV/
 .flaskenv
 run/*
 .idea
+vnpy
+vnpy_rpcservice

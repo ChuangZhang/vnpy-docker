@@ -75,8 +75,8 @@ RUN ta-lib-config --libs
 
 # python
 RUN mkdir -p $WORKSPACE
-RUN cd $WORKSPACE && python3 -m venv --system-site-packages --copies venv
-RUN $WORKSPACE/venv/bin/pip install pip --upgrade -i ${INDEX} && \
+RUN cd $WORKSPACE && python3 -m venv --copies venv && \
+    $WORKSPACE/venv/bin/pip install pip --upgrade -i ${INDEX} && \
     $WORKSPACE/venv/bin/pip install wheel --upgrade -i ${INDEX}
 
 # clone vnpy (commit: b4e8a079be2123e72bfa9a8cccebc784aaee3789)
@@ -85,14 +85,12 @@ RUN $WORKSPACE/venv/bin/pip install pip --upgrade -i ${INDEX} && \
 ENV prefix /usr/bin
 # upgrade numpy
 RUN $WORKSPACE/venv/bin/pip install numpy --upgrade -i ${INDEX}
-RUN cd $WORKSPACE && \
-    git clone https://github.com/ChuangZhang/vnpy.git $WORKSPACE/vnpy
+COPY --chown=$USERNAME:root ./vnpy $WORKSPACE/vnpy
 RUN cd $WORKSPACE/vnpy && \
     bash install.sh $WORKSPACE/venv/bin/python3 https://pypi.tuna.tsinghua.edu.cn/simple
-RUN cd $WORKSPACE && \
-    git clone https://github.com/ChuangZhang/vnpy_rpcservice.git $WORKSPACE/vnpy_rpcservice
+COPY --chown=$USERNAME:root ./vnpy_rpcservice $WORKSPACE/vnpy_rpcservice
 RUN cd $WORKSPACE/vnpy_rpcservice && \
-    pip install -f .
+    $WORKSPACE/venv/bin/pip install .
 
 # RUN chmod +x ./vnpy/install.sh
 # RUN cd $WORKSPACE/vnpy && source $WORKSPACE/venv/bin/activate && ./install.sh 
