@@ -14,15 +14,15 @@ ENV WORKSPACE /home/$USERNAME/workspace
 # lang
 #---------------------------------------------------------------------------
 
-ENV LANG en_US.UTF-8
-ENV LANGUAGE en_US:
-
+ENV LANG en_US.UTF-8 
+ENV LC_ALL C 
+ 
 # base
 COPY ./files/etc/apt/sources.list /etc/apt/sources.list
 RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 3B4FE6ACC0B21F32
 RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 871920D1991BC93C
 RUN apt-get update && apt-get install -y build-essential \
-    wget curl vim git libtool automake \
+    wget curl vim git libtool automake python3.8 python3.8-venv python3-dev \
     sudo openssh-server libpq-dev locales
 RUN locale-gen $LANG
 
@@ -75,7 +75,7 @@ RUN ta-lib-config --libs
 
 # python
 RUN mkdir -p $WORKSPACE
-RUN cd $WORKSPACE && python3 -m venv --copies venv && \
+RUN cd $WORKSPACE && python3.8 -m venv --copies --system-site-packages venv && \
     $WORKSPACE/venv/bin/pip install pip --upgrade -i ${INDEX} && \
     $WORKSPACE/venv/bin/pip install wheel --upgrade -i ${INDEX}
 
@@ -118,8 +118,9 @@ RUN echo "source ~/workspace/venv/bin/activate" >> ~/.bashrc
 
 # timezone
 RUN echo "export TZ=Asia/Shanghai" >> ~/.profile
-RUN echo "export LC_CTYPE=en_US.utf-8" >> ~/.profile
+RUN echo "export LC_CTYPE=en_US.UTF-8" >> ~/.profile
 RUN echo "export LANG=en_US.UTF-8" >> ~/.profile
+RUN echo "export LC_ALL=C" >> ~/.profile
 # supress libGL error: No matching fbConfigs or visuals found
 RUN echo "export LIBGL_ALWAYS_INDIRECT=1" >> ~/.profile
 
