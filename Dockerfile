@@ -24,7 +24,7 @@ RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 871920D1991BC93C
 RUN apt-get update && apt-get install -y build-essential \
     wget curl vim git libtool automake python3.8 python3.8-venv python3-dev \
     sudo openssh-server libpq-dev locales
-RUN locale-gen $LANG
+RUN sed -i 's/# zh_CN/zh_CN/p' /etc/locale.gen && sed -i 's/# en_US/en_US/p' /etc/locale.gen && locale-gen
 
 #---------------------------------------------------------------------------
 # ssh
